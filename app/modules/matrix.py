@@ -1,4 +1,3 @@
-import random
 import numpy as np
 
 class Matrix:
@@ -28,7 +27,7 @@ class Matrix:
 
     def inverse(self):
         try:
-            return np.linalg.inv(self.values)
+            return str(np.linalg.inv(self.values))
         except np.linalg.LinAlgError:
             return "The matrix cannot be inverted"
         
