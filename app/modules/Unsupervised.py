@@ -215,18 +215,25 @@ def load_mnist_dataset():
 
 
 def plot_PCA_TSNE_unsupervised_module():
-    x_train,y_train,_,_=load_mnist_dataset()
-    color=['r' if i==0 else 'b' for i in y_train ]
+    x_train,y_train,x_test,y_test=load_mnist_dataset()
+    color_train=['r' if i==0 else 'b' for i in y_train ]
+    color_test = ['r' if i == 0 else 'b' for i in y_test]
     pca = PCA(n_components=2)
     pca_components = pca.fit_transform(x_train)
+    pca_components_test= pca.fit_transform(x_test)
     tsne = TSNE(n_components=2)
     tsne_components = tsne.fit_transform(x_train)
-    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-    ax1.scatter(pca_components[:, 0], pca_components[:, 1], c=color)
-    ax1.set_title('PCA')
-    ax2.scatter(tsne_components[:, 0], tsne_components[:, 1], c=color)
-    ax2.set_title('t-SNE')
-    plt.savefig('app/resources/pca_vs_tsne_my_unsupervised_module.png')
+    tsne_components_test = tsne.fit_transform(x_test)
+    _, ((ax1, ax2), (ax3, ax4))  = plt.subplots(2, 2, figsize=(12, 12))
+    ax1.scatter(pca_components[:, 0], pca_components[:, 1], c=color_train)
+    ax1.set_title('PCA train')
+    ax2.scatter(tsne_components[:, 0], tsne_components[:, 1], c=color_train)
+    ax2.set_title('t-SNE train')
+    ax3.scatter(pca_components_test[:, 0], pca_components_test[:, 1], c=color_test)
+    ax3.set_title('PCA Test')
+    ax4.scatter(tsne_components_test[:, 0], tsne_components_test[:, 1], c=color_test)
+    ax4.set_title('t-SNE Test')
+    plt.savefig('app/resources/pca_vs_tsne_scikit.png')
 
 def PCA_Training_scikit_unsupervised_module(x_train,y_train,x_test,y_test):
     pca = PCA(n_components=2)

@@ -83,7 +83,7 @@ async def accuracy_PCA_TSNE_scikit_learn():
     normal_score=Train_model_scikit_learn(x_train,y_train,x_test,y_test)
     PCA_score=PCA_Training_scikit_learn(x_train,y_train,x_test,y_test)
     TSNE_score=TSNE_Training_scikit_learn(x_train,y_train,x_test,y_test)
-    return {'normal_score':normal_score,'PCA_score':PCA_score,'TSNE_score':TSNE_score,}
+    return {'normal_accuracy':normal_score,'PCA_accuracy':PCA_score,'TSNE_accuracy':TSNE_score}
 
 @app.get("/accuracy_PCA_TSNE_my_unsupervised_module")
 async def accuracy_PCA_TSNE_scikit_learn():

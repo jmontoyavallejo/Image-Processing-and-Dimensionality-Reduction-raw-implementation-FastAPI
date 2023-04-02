@@ -35,6 +35,3 @@ class Matrix:
         A = np.dot(self.values, self.values.T)
         B = np.dot(self.values.T, self.values)
         return {'eigenvalues A*A.T':str(np.linalg.eigvals(A)),'eigenvalues A.T*A':str(np.linalg.eigvals(B))}
-    
-    def values(self):
-        return str(self.values)
