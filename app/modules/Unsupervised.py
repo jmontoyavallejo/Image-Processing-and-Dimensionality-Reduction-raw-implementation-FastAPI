@@ -1,30 +1,114 @@
 import pandas as pd
 import numpy as np
 
-class PCA:
-    def __init__(self, n_components=None):
+class BaseEstimator:
+    y_required = True
+    fit_required = True
+
+    def _setup_input(self, X, y=None):
+        """Ensure inputs to an estimator are in the expected format.
+        Ensures X and y are stored as numpy ndarrays by converting from an
+        array-like object if necessary. Enables estimators to define whether
+        they require a set of y target values or not with y_required, e.g.
+        kmeans clustering requires no target labels and is fit against only X.
+        Parameters
+        ----------
+        X : array-like
+            Feature dataset.
+        y : array-like
+            Target values. By default is required, but if y_required = false
+            then may be omitted.
+        """
+        if not isinstance(X, np.ndarray):
+            X = np.array(X)
+
+        if X.size == 0:
+            raise ValueError("Got an empty matrix.")
+
+        if X.ndim == 1:
+            self.n_samples, self.n_features = 1, X.shape
+        else:
+            self.n_samples, self.n_features = X.shape[0], np.prod(X.shape[1:])
+
+        self.X = X
+
+        if self.y_required:
+            if y is None:
+                raise ValueError("Missed required argument y")
+
+            if not isinstance(y, np.ndarray):
+                y = np.array(y)
+
+            if y.size == 0:
+                raise ValueError("The targets array must be no-empty.")
+
+        self.y = y
+
+    def fit(self, X, y=None):
+        self._setup_input(X, y)
+
+    def predict(self, X=None):
+        if not isinstance(X, np.ndarray):
+            X = np.array(X)
+
+        if self.X is not None or not self.fit_required:
+            return self._predict(X)
+        else:
+            raise ValueError("You must call `fit` before `predict`")
+
+    def _predict(self, X=None):
+        raise NotImplementedError()
+
+class PCA(BaseEstimator):
+    y_required = False
+
+    def __init__(self, n_components, solver="svd"):
+        """Principal component analysis (PCA) implementation.
+        Transforms a dataset of possibly correlated values into n linearly
+        uncorrelated components. The components are ordered such that the first
+        has the largest possible variance and each following component as the
+        largest possible variance given the previous components. This causes
+        the early components to contain most of the variability in the dataset.
+        Parameters
+        ----------
+        n_components : int
+        solver : str, default 'svd'
+            {'svd', 'eigen'}
+        """
+        self.solver = solver
         self.n_components = n_components
-        self.eigenvectors = None
+        self.components = None
+        self.mean = None
 
-    def fit(self, X):
-        mean_centered = X - X.mean(axis=0)
-        cov_matrix = np.cov(mean_centered.T)
-        eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
-        eigenvectors = eigenvectors.T
-        sorted_indices = np.argsort(eigenvalues)[::-1]
-        self.eigenvectors = eigenvectors[sorted_indices[:self.n_components]]
+    def fit(self, X, y=None):
+        self.mean = np.mean(X, axis=0)
+        self._decompose(X)
 
-    def fit_transform(self, X):
-        self.fit(X)
-        mean_centered = X - X.mean(axis=0)
-        return np.dot(mean_centered, self.eigenvectors.T)
+    def _decompose(self, X):
+        # Mean centering
+        X = X.copy()
+        X -= self.mean
+
+        if self.solver == "svd":
+            _, s, Vh = SVD(X, full_matrices=True)
+        elif self.solver == "eigen":
+            s, Vh = np.linalg.eig(np.cov(X.T))
+            Vh = Vh.T
+
+        s_squared = s ** 2
+        variance_ratio = s_squared / s_squared.sum()
+        self.components = Vh[0: self.n_components]
 
     def transform(self, X):
-        mean_centered = X - X.mean(axis=0)
-        return np.dot(mean_centered, self.eigenvectors.T)
+        X = X.copy()
+        X -= self.mean
+        return np.dot(X, self.components.T)
+
+    def _predict(self, X=None):
+        return self.transform(X)
     
     
-class SVC:
+class SVD:
     def __init__(self, C=1.0, kernel='rbf', gamma='scale'):
         self.C = C
         self.kernel = kernel

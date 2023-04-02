@@ -2,13 +2,9 @@ from typing import Union
 
 from fastapi import FastAPI
 from app.modules.matrix import Matrix
-from app.modules.Unsupervised import PCA,SVC,TSNE
-from app.modules.Picture import Picture
-from typing import List, Dict, Union
-import numpy as np
-from matplotlib import pyplot as plt
-import io
-import base64
+from app.modules.Unsupervised import PCA,SVD,TSNE
+from app.modules.Picture import Pictures
+from fastapi.responses import FileResponse
 app = FastAPI()
 
 
@@ -32,23 +28,22 @@ async def calculate_matrix(cols:int, rows:int):
     }
     return results
 
-@app.get("/line-plot")
-def line_plot():
-    # Crea los datos para la gráfica
-    x = [1, 2, 3, 4, 5]
-    y = [1, 4, 9, 16, 25]
-    
-    # Crea la gráfica
-    fig, ax = plt.subplots()
-    ax.plot(x, y)
-    
-    # Convierte la gráfica a una imagen
-    img = io.BytesIO()
-    fig.savefig(img, format='png')
-    img.seek(0)
-    
-    # Convierte la imagen a base64
-    plot_data = base64.b64encode(img.getvalue()).decode()
-    
-    # Devuelve la imagen como respuesta
-    return {"image": plot_data}
+
+
+@app.get("/MyImage")
+def get_myimage():
+    pictures = Pictures()
+    pictures.save_my_image()
+    return FileResponse('app/resources/my_image.png')
+
+@app.get("/AverageImage")
+def get_Average_Image():
+    pictures = Pictures()
+    pictures.save_average_image()
+    return FileResponse('app/resources/average_image.png')
+
+@app.post("/SDV_MyImage")
+def get_Average_Image():
+    pictures = Pictures()
+    pictures.save_average_image()
+    return FileResponse('app/resources/average_image.png')
