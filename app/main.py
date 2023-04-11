@@ -59,7 +59,7 @@ async def compare_my_image_to_average_image():
 @app.get("/apply_SDV_MyImage")
 async def apply_SDV_MyImage():
     pictures = Pictures()
-    SVD_unsupervised_module(pictures.cara0)
+    pictures.save_svd_image()
     return FileResponse('app/resources/SDV_image.png')
 
 
@@ -116,3 +116,28 @@ async def mathematical_principles_behind_LDA():
     return {'Dirichlet distribution':'The Dirichlet distribution is a probability distribution over a simplex, which is a multi-dimensional space whose points all lie on the surface of a hyperplane. In the context of LDA, the Dirichlet distribution is used to model the distribution of topics over a set of documents. Specifically, each document is represented as a mixture of topics, and the Dirichlet distribution is used to model the probability distribution of these mixtures.',
             'Bayesian inference':'LDA is a Bayesian model, which means that it uses Bayes theorem to perform probabilistic inference. Bayes theorem is a mathematical formula that allows us to update our beliefs about a hypothesis based on new evidence. In the context of LDA, we use Bayes theorem to infer the underlying topic structure of a set of documents. Specifically, we start with a prior belief about the topic structure, and we update this belief based on the observed words in the documents.',
             'Matrix factorization':'LDA can be viewed as a form of matrix factorization, where we factorize a matrix of word frequencies into two matrices: one representing the distribution of topics over the words, and the other representing the distribution of documents over the topics. This factorization is achieved using Bayesian inference and optimization techniques.'}
+
+
+@app.get("/Unsupervised_PCA_TSNE_MNIST_random_prediction")
+async def Unsupervised_PCA_TSNE_MNIST_random_prediction():
+    import pickle
+    import numpy as np
+    from app.modules.Unsupervised import load_mnist_dataset
+    x_train, y_train, x_test, y_test = load_mnist_dataset()
+    with open("app/resources/trained_TSNE_model-0.1.0.pkl", "rb") as f:
+        tsne_model = pickle.load(f)
+    with open('app/resources/trained_PCA_model-0.1.0.pkl', 'rb') as f:
+        PCA_model = pickle.load(f)
+    with open('app/resources/PCA_scaler-0.1.0.pkl', 'rb') as f:
+        pca_scaler = pickle.load(f)
+    with open('app/resources/TSNE_data-0.1.0.pkl', 'rb') as f:
+        tsne_x_train = pickle.load(f)
+    sampled_arr = x_train[np.random.choice(x_train.shape[0], 1, replace=False)]
+    PCA_sampled_arr = pca_scaler.transform(sampled_arr)
+    pca_prediction = PCA_model.predict(PCA_sampled_arr)
+    tsne_sampled_arr = tsne_x_train[np.random.choice(tsne_x_train.shape[0], 1, replace=False)]
+    tsne_prediction=tsne_model.predict(tsne_sampled_arr)
+    print(pca_prediction)
+    print(tsne_prediction)
+    return 'pca_prediction'+': '+str(pca_prediction)+','+'tsne_prediction'+': '+str(tsne_prediction)
+    #return {'tsne_prediction':tsne_prediction,'pca_prediction':pca_prediction}

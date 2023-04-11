@@ -13,6 +13,7 @@ class Matrix:
             self.det = np.linalg.det(self.values)
         else:
             self.det = None
+        self.shape = (rows, cols)
 
     def rank(self):
         return float(np.linalg.matrix_rank(self.values))
