@@ -1,7 +1,9 @@
-
 # Image Processing and Dimensionality Reduction Repository
 
 This is a repository for testing image processing techniques and dimensionality reduction algorithms. The repository includes scripts for performing various image transformations from scratch, as well as implementing dimensionality reduction techniques such as PCA, SVD, and t-SNE. The project is interactive through FastAPI and is documented in the FastAPI docs.
+
+
+you can choose to see the sumary of the project in the notebook and pdf called sumary.
 
 ## Installation
 
