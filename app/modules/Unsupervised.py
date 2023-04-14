@@ -100,7 +100,7 @@ class PCA_unsupervised_module(BaseEstimator):
         X -= self.mean
 
         if self.solver == "svd":
-            _, s, Vh = SVD_unsupervised_module(X)
+            _, s, Vh = np.linalg.svd(X)
         elif self.solver == "eigen":
             s, Vh = np.linalg.eig(np.cov(X.T))
             Vh = Vh.T
@@ -389,22 +389,9 @@ def TSNE_Training_unsupervised_module(x_train,y_train,x_test,y_test):
     model.fit(x_train_tsne, y_train)
     return model.score(x_test_tsne, y_test)
 
-def save_models(x_train,y_train,x_test,y_test):
-    tsne = TSNE_Training_unsupervised_module(n_components=2,random_state=1111)
-    x_train_tsne = tsne.fit_transform(x_train)
-    model_tsne = LogisticRegression(random_state=1111)
-    model_tsne.fit(x_train_tsne, y_train)
-    with open('src/resources/trained_TSNE_model-0.1.0.pkl', 'wb') as file:
-        pickle.dump(model_tsne, file)
-    pca = PCA_unsupervised_module(n_components=2,random_state=1111)
-    x_train_pca = pca.fit_transform(x_train)
-    model_pca = LogisticRegression(random_state=1111)
-    model_pca.fit(x_train_pca, y_train)
-    with open('src/resources/trained_PCA_model-0.1.0.pkl', 'wb') as file:
-        pickle.dump(model_tsne, file)
 
 def save_models(x_train,y_train,x_test,y_test):
-    tsne = TSNE_Training_unsupervised_module(n_components=2,random_state=1111)
+    tsne = TSNE_2(n_components=2,random_state=1111)
     x_train_tsne = tsne.fit_transform(x_train)
     model_tsne = LogisticRegression(random_state=1111)
     model_tsne.fit(x_train_tsne, y_train)
@@ -424,3 +411,183 @@ def save_models(x_train,y_train,x_test,y_test):
         pickle.dump(tsne, file)
     with open('app/resources/TSNE_data-0.1.0.pkl', 'wb') as file:
         pickle.dump(x_train_tsne, file)
+
+class SVD_unsupervised_module_fit_transform:
+    def _init_(self, n_components=None):
+        self.n_components = n_components
+    
+    def fit(self, X):
+        X = np.array(X)
+        U, s, Vt = np.linalg.svd(X, full_matrices=False)
+        self.components_ = Vt[:self.n_components].T if self.n_components else Vt.T
+        self.explained_variance_ = (s ** 2) / (X.shape[0] - 1)
+        self.singular_values_ = s
+    
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.transform(X)
+    
+    def transform(self, X):
+        X = np.array(X)
+        return np.dot(X, self.components_)
+    
+    def inverse_transform(self, X, k=None):
+        if k is None:
+            k = self.n_components
+        X = np.array(X)
+        U_reduced = np.dot(X, self.components_[:k, :].T)
+        return U_reduced
+
+
+def l2_distance(X):
+    sum_X = np.sum(X * X, axis=1)
+    return (-2 * np.dot(X, X.T) + sum_X).T + sum_X
+  
+class TSNE_2(BaseEstimator):
+    y_required = False
+
+    def __init__(self, n_components=2, perplexity=30.0, max_iter=200, learning_rate=500):
+        """A t-Distributed Stochastic Neighbor Embedding implementation.
+        Parameters
+        ----------
+        max_iter : int, default 200
+        perplexity : float, default 30.0
+        n_components : int, default 2
+        """
+        self.max_iter = max_iter
+        self.perplexity = perplexity
+        self.n_components = n_components
+        self.initial_momentum = 0.5
+        self.final_momentum = 0.8
+        self.min_gain = 0.01
+        self.lr = learning_rate
+        self.tol = 1e-5
+        self.perplexity_tries = 50
+
+    def fit_transform(self, X, y=None):
+        self._setup_input(X, y)
+        np.random.seed(1111)
+        Y = np.random.randn(self.n_samples, self.n_components)
+        velocity = np.zeros_like(Y)
+        gains = np.ones_like(Y)
+
+        P = self._get_pairwise_affinities(X)
+
+        iter_num = 0
+        while iter_num < self.max_iter:
+            iter_num += 1
+
+            D = l2_distance(Y)
+            Q = self._q_distribution(D)
+
+            # Normalizer q distribution
+            Q_n = Q / np.sum(Q)
+
+            # Early exaggeration & momentum
+            pmul = 4.0 if iter_num < 100 else 1.0
+            momentum = 0.5 if iter_num < 20 else 0.8
+
+            # Perform gradient step
+            grads = np.zeros(Y.shape)
+            for i in range(self.n_samples):
+                grad = 4 * np.dot((pmul * P[i] - Q_n[i]) * Q[i], Y[i] - Y)
+                grads[i] = grad
+
+            gains = (gains + 0.2) * ((grads > 0) != (velocity > 0)) + (gains * 0.8) * ((grads > 0) == (velocity > 0))
+            gains = gains.clip(min=self.min_gain)
+
+            velocity = momentum * velocity - self.lr * (gains * grads)
+            Y += velocity
+            Y = Y - np.mean(Y, 0)
+
+            error = np.sum(P * np.log(P / Q_n))
+            logging.info("Iteration %s, error %s" % (iter_num, error))
+        return Y
+
+    def _get_pairwise_affinities(self, X):
+        """Computes pairwise affinities."""
+        affines = np.zeros((self.n_samples, self.n_samples), dtype=np.float32)
+        target_entropy = np.log(self.perplexity)
+        distances = l2_distance(X)
+
+        for i in range(self.n_samples):
+            affines[i, :] = self._binary_search(distances[i], target_entropy)
+
+        # Fill diagonal with near zero value
+        np.fill_diagonal(affines, 1.0e-12)
+
+        affines = affines.clip(min=1e-100)
+        affines = (affines + affines.T) / (2 * self.n_samples)
+        return affines
+
+    def _binary_search(self, dist, target_entropy):
+        """Performs binary search to find suitable precision."""
+        precision_min = 0
+        precision_max = 1.0e15
+        precision = 1.0e5
+
+        for _ in range(self.perplexity_tries):
+            denom = np.sum(np.exp(-dist[dist > 0.0] / precision))
+            beta = np.exp(-dist / precision) / denom
+
+            # Exclude zeros
+            g_beta = beta[beta > 0.0]
+            entropy = -np.sum(g_beta * np.log2(g_beta))
+
+            error = entropy - target_entropy
+
+            if error > 0:
+                # Decrease precision
+                precision_max = precision
+                precision = (precision + precision_min) / 2.0
+            else:
+                # Increase precision
+                precision_min = precision
+                precision = (precision + precision_max) / 2.0
+
+            if np.abs(error) < self.tol:
+                break
+
+        return beta
+
+    def _q_distribution(self, D):
+        """Computes Student t-distribution."""
+        Q = 1.0 / (1.0 + D)
+        np.fill_diagonal(Q, 0.0)
+        Q = Q.clip(min=1e-100)
+        return Q
+
+
+def TSNE_2_Training_unsupervised_module(x_train,y_train,x_test,y_test):
+    tsne = TSNE_2(n_components=2)
+    x_train_tsne = tsne.fit_transform(x_train)
+    x_test_tsne = tsne.fit_transform(x_test)
+    model = LogisticRegression(random_state=1111)
+    model.fit(x_train_tsne, y_train)
+    return model.score(x_test_tsne, y_test)
+
+# x_train,y_train,x_test,y_test=load_mnist_dataset()
+# print(TSNE_2_Training_unsupervised_module(x_train,y_train,x_test,y_test))
+
+def plot_PCA_TSNE_2_unsupervised_module():
+    x_train,y_train,x_test,y_test=load_mnist_dataset()
+    color_train=['r' if i==0 else 'b' for i in y_train ]
+    color_test = ['r' if i == 0 else 'b' for i in y_test]
+    pca = PCA_unsupervised_module(n_components=2)
+    pca.fit(x_train)
+    pca_components = pca.transform(x_train)
+    pca.fit(x_test)
+    pca_components_test= pca.transform(x_test)
+    tsne = TSNE_2(n_components=2)
+    tsne_components = tsne.fit_transform(x_train)
+    tsne_components_test = tsne.fit_transform(x_test)
+    _, ((ax1, ax2), (ax3, ax4))  = plt.subplots(2, 2, figsize=(12, 12))
+    ax1.scatter(pca_components[:, 0], pca_components[:, 1], c=color_train)
+    ax1.set_title('PCA train')
+    ax2.scatter(tsne_components[:, 0], tsne_components[:, 1], c=color_train)
+    ax2.set_title('t-SNE train')
+    ax3.scatter(pca_components_test[:, 0], pca_components_test[:, 1], c=color_test)
+    ax3.set_title('PCA Test')
+    ax4.scatter(tsne_components_test[:, 0], tsne_components_test[:, 1], c=color_test)
+    ax4.set_title('t-SNE Test')
+    plt.savefig('app/resources/pca_vs_tsne_unsupervised_module.png')
